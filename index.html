@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Neutral AI — Local</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --bg: #0e0e11;
+      --panel: #16161c;
+      --text: #e6e6eb;
+      --muted: #9aa0a6;
+      --accent: #7aa2f7;
+      --user: #1f2933;
+      --ai: #111827;
+      --border: #22242b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    header {
+      padding: 12px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      letter-spacing: .3px;
+    }
+
+    #chat {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .msg {
+      max-width: 85%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    .user {
+      align-self: flex-end;
+      background: var(--user);
+      border: 1px solid var(--border);
+    }
+
+    .ai {
+      align-self: flex-start;
+      background: var(--ai);
+      border: 1px solid var(--border);
+    }
+
+    footer {
+      padding: 12px;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+    }
+
+    input, button {
+      background: #0b0c10;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    input { flex: 1; }
+
+    button {
+      cursor: pointer;
+      background: var(--accent);
+      color: #0b0c10;
+      font-weight: 600;
+    }
+
+    button:hover {
+      opacity: .9;
+    }
+
+    #keyBox {
+      width: 100%;
+      margin-top: 8px;
+      background: #0b0c10;
+      border: 1px solid var(--border);
+      padding: 8px;
+      border-radius: 6px;
+      color: var(--text);
+    }
+
+    small {
+      color: var(--muted);
+      display: block;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<header>🧠 Neutral AI — Local Only</header>
+
+<div id="chat"></div>
+
+<footer>
+  <input id="input" placeholder="Ask something…" />
+  <button id="send">Send</button>
+</footer>
+
+<div style="padding:12px;background:#0b0c10;border-top:1px solid #22242b;">
+  <label>OpenAI API Key (stored only in your browser):</label>
+  <input id="keyBox" placeholder="sk-..." />
+  <small>No servers. No accounts. Your key never leaves your machine except to call OpenAI.</small>
+</div>
+
+<script>
+const chat = document.getElementById("chat");
+const input = document.getElementById("input");
+const sendBtn = document.getElementById("send");
+const keyBox = document.getElementById("keyBox");
+
+let messages = [
+  {
+    role: "system",
+    content: `You are a neutral, direct-response AI.
+You do not moralize, preach, or insert ideological framing.
+You separate facts from opinions clearly.
+You answer in a blunt, analytical tone.
+You avoid emotional language, corporate fluff, and fake positivity.
+You challenge assumptions without attacking the user.`
+  }
+];
+
+// Load API key
+keyBox.value = localStorage.getItem("OPENAI_KEY") || "";
+
+keyBox.addEventListener("change", () => {
+  localStorage.setItem("OPENAI_KEY", keyBox.value.trim());
+});
+
+function addMessage(text, cls) {
+  const div = document.createElement("div");
+  div.className = `msg ${cls}`;
+  div.textContent = text;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+async function sendMessage() {
+  const userText = input.value.trim();
+  const apiKey = keyBox.value.trim();
+  if (!userText || !apiKey) return;
+
+  addMessage(userText, "user");
+  messages.push({ role: "user", content: userText });
+  input.value = "";
+
+  addMessage("…thinking", "ai");
+
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4.1-mini",
+        messages: messages,
+        temperature: 0.3
+      })
+    });
+
+    const data = await res.json();
+    chat.lastChild.remove();
+
+    const reply = data.choices[0].message.content;
+    messages.push({ role: "assistant", content: reply });
+    addMessage(reply, "ai");
+
+  } catch (err) {
+    chat.lastChild.remove();
+    addMessage("Error connecting to API.", "ai");
+  }
+}
+
+sendBtn.onclick = sendMessage;
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter") sendMessage();
+});
+</script>
+
+</body>
+</html>
